@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WtW — word to word</title>
+<meta name="description" content="WtW — карточки для изучения слов с переводом и озвучкой">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#05070d;--fg:#e8eefc;--mute:#7f8cab;--line:#18213a;--card:#0b1222;--acc:#2f6bff;--accfg:#fff;--ok:#5eead4;--bad:#ff6b81;color-scheme:dark;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(900px 420px at 50% -120px,#0f1d44 0%,transparent 70%) no-repeat,var(--bg);min-height:100vh;color:var(--fg);font:16px/1.5 -apple-system,"Inter","Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:26px;font-weight:800;letter-spacing:.01em;margin:0 0 22px}
+h1 b{color:var(--acc)}
+h1 span{font-size:13px;font-weight:400;color:var(--mute);margin-left:10px;letter-spacing:.03em}
+nav{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-bottom:28px}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 0;color:var(--mute);font:inherit;cursor:pointer}
+nav button.on{color:var(--fg);border-color:var(--acc)}
+input{width:100%;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:inherit;outline:none}
+input:focus{border-color:var(--acc)}
+label{display:block;font-size:13px;color:var(--mute);margin:0 0 6px}
+.row{display:flex;gap:10px;margin-bottom:18px}
+.row>*{flex:1}
+button.p{background:var(--acc);color:var(--accfg);border:0;border-radius:10px;padding:12px 18px;font:inherit;cursor:pointer}
+button.p:disabled{opacity:.4;cursor:default}
+button.g{background:none;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:12px 18px;font:inherit;cursor:pointer}
+.res{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin-top:22px}
+.res .big{font-size:26px;margin:0 0 4px}
+.res .sub,.mute{color:var(--mute);font-size:14px}
+.res .ex{margin-top:12px;font-size:14px;color:var(--mute);font-style:italic}
+.ts{font-family:"Charis SIL","Doulos SIL","Segoe UI",Roboto,sans-serif;color:var(--ok);font-size:16px;margin-top:6px}
+.exbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;max-width:100%}
+.exbox .e1{color:var(--fg);font-style:italic}
+.exbox .e2{color:var(--mute);margin-top:2px}
+.msg{margin-top:14px;font-size:14px;color:var(--bad)}
+.item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.item b{font-weight:500}
+.item .x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:18px;padding:4px 8px}
+.flash{background:var(--card);border:1px solid var(--line);border-radius:18px;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;cursor:pointer;user-select:none}
+.flash .big{font-size:32px;margin:0}
+.flash .sub{margin-top:8px;color:var(--mute);font-size:14px}
+.hint{text-align:center;font-size:13px;color:var(--mute);margin:14px 0 18px}
+.empty{text-align:center;color:var(--mute);padding:40px 0}
+.spk{background:none;border:1px solid var(--line);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer;vertical-align:middle;color:var(--fg)}
+.scene{perspective:1100px}
+.flip{position:relative;height:260px;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.2,.2,1);cursor:pointer}
+.flip.on{transform:rotateY(180deg)}
+.face{box-shadow:0 12px 40px rgba(47,107,255,.10);position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--card);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:auto;user-select:none}
+.face.back{transform:rotateY(180deg)}
+.flip:not(.on) .face.back{pointer-events:none}
+.flip.on .face:not(.back){pointer-events:none}
+.face .big{font-size:30px;margin:0}
+.face .sub{margin-top:8px;color:var(--mute);font-size:14px}
+.chips{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.chip{background:none;border:1px solid var(--line);color:var(--mute);border-radius:20px;padding:6px 14px;font:inherit;font-size:14px;cursor:pointer}
+.chip.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+#sets{margin:-8px 0 22px}
+.note{font-size:13px;color:var(--mute);margin:-6px 0 14px}
+.sec{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin:22px 0 4px}
+.sec:first-child{margin-top:0}
+@media (prefers-reduced-motion:reduce){.flip{transition:none}}
+.speak{margin-top:16px;background:var(--acc);color:#fff;border:0;border-radius:24px;padding:10px 20px;font:inherit;font-size:15px;cursor:pointer}
+.prog{text-align:center;font-size:13px;color:var(--mute);margin-bottom:10px}
+.result{text-align:center;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:44px 24px;box-shadow:0 12px 40px rgba(47,107,255,.10)}
+.result .score{font-size:40px;font-weight:800}
+.result .rmsg{margin-top:8px;font-size:18px;color:var(--mute)}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>W<b>t</b>W<span>word to word</span></h1>
+<nav>
+  <button id="t-add" class="on">Добавить</button>
+  <button id="t-study">Учить</button>
+  <button id="t-list">Слова <span id="cnt" class="mute"></span></button>
+</nav>
+<div id="sets" class="chips"></div>
+
+<section id="v-add">
+  <label for="lang">Язык перевода</label>
+  <input id="lang" list="langs" placeholder="например: английский" autocomplete="off">
+  <datalist id="langs"><option value="английский"><option value="немецкий"><option value="французский"><option value="испанский"><option value="итальянский"><option value="португальский"><option value="японский"><option value="китайский"><option value="корейский"><option value="турецкий"><option value="польский"><option value="украинский"><option value="шведский"><option value="голландский"><option value="чешский"><option value="греческий"><option value="арабский"></datalist>
+  <div style="height:18px"></div>
+  <label for="word">Слово или фраза</label>
+  <div class="row">
+    <input id="word" placeholder="введите слово" autocomplete="off">
+    <button id="go" class="p" style="flex:0 0 auto">Перевести</button>
+  </div>
+  <div id="msg" class="msg hide"></div>
+  <div id="res" class="res hide"></div>
+</section>
+
+<section id="v-study" class="hide"></section>
+
+<section id="v-list" class="hide"></section>
+</main>
+
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id)};
+  var state = {lang:"английский", cards:[]};
+  var LS = "wordcards:v1";
+  var tab = "add";
+  function norm(x){ return String(x||"").trim().toLowerCase(); }
+  function cap(x){ return x ? x.charAt(0).toUpperCase()+x.slice(1) : x; }
+  function cards(){ var k = norm(state.lang); return state.cards.filter(function(c){ return c.set===k; }); }
+  function migrate(){ state.cards.forEach(function(c){ if (!c.set) c.set = norm(state.lang); }); }
+  function renderSets(){
+    var names = [], counts = {};
+    state.cards.forEach(function(c){ if (!(c.set in counts)) { counts[c.set]=0; names.push(c.set); } counts[c.set]++; });
+    var cur0 = norm(state.lang);
+    if (cur0 && !(cur0 in counts)) { names.push(cur0); counts[cur0]=0; }
+    var box = $("sets");
+    box.innerHTML = names.map(function(n){
+      return '<button class="chip'+(n===cur0?' on':'')+'" data-set="'+esc(n).replace(/"/g,'&quot;')+'">'+esc(cap(n))+' '+counts[n]+'</button>';
+    }).join("");
+    box.querySelectorAll(".chip").forEach(function(b){
+      b.onclick = function(){
+        state.lang = b.dataset.set; $("lang").value = state.lang;
+        persist(); renderSets(); updateCount(); go(tab);
+      };
+    });
+  }
+  var pending = null;
+
+  try { var raw = localStorage.getItem(LS); if (raw) state = Object.assign(state, JSON.parse(raw)); } catch(e){}
+  migrate();
+
+  function persist(){
+    try { localStorage.setItem(LS, JSON.stringify(state)); } catch(e){}
+  }
+
+  function showMsg(t){ var m=$("msg"); m.textContent=t; m.classList.toggle("hide",!t); }
+  function esc(s){ var d=document.createElement("div"); d.textContent=s==null?"":s; return d.innerHTML; }
+
+  // Speech
+  var CODES = {"английский":"en-US","немецкий":"de-DE","французский":"fr-FR","испанский":"es-ES","итальянский":"it-IT","португальский":"pt-PT","японский":"ja-JP","китайский":"zh-CN","корейский":"ko-KR","турецкий":"tr-TR","польский":"pl-PL"};
+  // Озвучка: лучший доступный голос браузера
+  function speak(text, lc){
+    if (!text) return;
+    speakLocal(text, lc);
+  }
+  function pickVoice(code){
+    var vs = speechSynthesis.getVoices(); if (!vs.length || !code) return null;
+    var base = code.toLowerCase().split("-")[0];
+    var full = code.toLowerCase().replace("_","-");
+    var best = null, bestScore = -1;
+    vs.forEach(function(v){
+      var vl = (v.lang||"").toLowerCase().replace("_","-");
+      if (vl.split("-")[0] !== base) return;
+      var sc = 1;
+      if (vl === full) sc += 2;
+      if (/natural|neural|online|premium|enhanced|google|siri/i.test(v.name)) sc += 4;
+      if (v.localService === false) sc += 1;
+      if (sc > bestScore) { bestScore = sc; best = v; }
+    });
+    return best;
+  }
+  if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); }; }
+  function speakLocal(text, lc){
+    try {
+      if (!window.speechSynthesis) { showMsg("Озвучка не поддерживается в этом браузере."); return; }
+      var code = CODES[(state.lang||"").toLowerCase()] || lc || "";
+      var u = new SpeechSynthesisUtterance(text);
+      if (code) u.lang = code;
+      var v = pickVoice(code); if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = 0.85;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    } catch(e){ showMsg("Не удалось воспроизвести звук."); }
+  }
+
+  // Tabs
+  var tabs = ["add","study","list"];
+  function go(t){
+    tab = t;
+    tabs.forEach(function(k){ $("v-"+k).classList.toggle("hide",k!==t); $("t-"+k).classList.toggle("on",k===t); });
+    if (t==="study") startStudy();
+    if (t==="list") renderList();
+  }
+  tabs.forEach(function(k){ $("t-"+k).onclick=function(){go(k)}; });
+
+  // Add
+  $("lang").value = state.lang;
+  $("lang").onchange = function(){ state.lang = $("lang").value.trim() || state.lang; $("lang").value = state.lang; persist(); renderSets(); updateCount(); };
+  $("word").addEventListener("keydown", function(e){ if(e.key==="Enter") translate(); });
+  $("go").onclick = translate;
+
+  // Translation: free MyMemory API (no key, works from any domain).
+  // Optional: put your e-mail here to raise the free daily limit (~50 000 chars instead of ~5 000).
+  var MM_EMAIL = "";
+  var LANGS = {"английский":"en","немецкий":"de","французский":"fr","испанский":"es","итальянский":"it","португальский":"pt","японский":"ja","китайский":"zh-CN","корейский":"ko","турецкий":"tr","польский":"pl","украинский":"uk","русский":"ru","шведский":"sv","норвежский":"no","датский":"da","финский":"fi","голландский":"nl","нидерландский":"nl","чешский":"cs","греческий":"el","арабский":"ar","иврит":"he","хинди":"hi","вьетнамский":"vi","тайский":"th","латышский":"lv","литовский":"lt","эстонский":"et","болгарский":"bg","румынский":"ro","венгерский":"hu","сербский":"sr","казахский":"kk","грузинский":"ka","армянский":"hy","английский (сша)":"en"};
+  function langCode(name){
+    var n = norm(name);
+    if (LANGS[n]) return LANGS[n];
+    if (/^[a-z]{2,3}(-[a-z]{2,4})?$/i.test(n)) return n;
+    return null;
+  }
+  function exHtml(c){
+    return c.ex ? '<div class="exbox"><div class="e1">'+esc(c.ex)+'</div>'+(c.exTr?'<div class="e2">'+esc(c.exTr)+'</div>':'')+'</div>' : '';
+  }
+  async function translate(){
+    var w = $("word").value.trim(), lang = $("lang").value.trim();
+    if (!w || !lang) { showMsg("Введите язык и слово."); return; }
+    if (w.length > 450) { showMsg("Слишком длинный текст: максимум 450 символов."); return; }
+    var tgt = langCode(lang);
+    if (!tgt) { showMsg("Не знаю такой язык. Выберите из списка или введите код, например: en, de, sv."); return; }
+    var src = /[а-яё]/i.test(w) ? "ru" : "Autodetect";
+    if (src === "ru" && tgt === "ru") { showMsg("Слово уже на русском — выберите другой язык перевода."); return; }
+    state.lang = lang; renderSets(); updateCount(); showMsg(""); $("go").disabled = true; $("go").textContent = "…";
+    try {
+      var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(w) +
+                "&langpair=" + encodeURIComponent(src + "|" + tgt) + (MM_EMAIL ? "&de=" + encodeURIComponent(MM_EMAIL) : "");
+      var resp = await fetch(url);
+      var data = await resp.json();
+      var status = Number(data.responseStatus);
+      var tr = data.responseData && data.responseData.translatedText;
+      if (status === 429 || /MYMEMORY WARNING/i.test(tr || "")) { showMsg("Дневной лимит бесплатного перевода исчерпан. Попробуйте завтра или укажите e-mail в MM_EMAIL."); }
+      else if (status !== 200 || !tr) { showMsg("Не удалось перевести" + (data.responseDetails ? ": " + data.responseDetails : ".") ); }
+      else {
+        pending = {set:norm(lang), w:w, tr:tr, lc:tgt, ts:"", ex:"", exTr:"", ext:true};
+        renderPending();
+      }
+    } catch(e) {
+      showMsg("Нет соединения с сервисом перевода. Проверьте интернет и попробуйте ещё раз.");
+    }
+    $("go").disabled = false; $("go").textContent = "Перевести";
+  }
+
+  function renderPending(){
+    var p = pending, box = $("res");
+    box.classList.remove("hide");
+    box.innerHTML = '<p class="big">'+esc(p.tr)+' <button class="spk" id="spk" aria-label="Произнести">🔊</button></p>' +
+      (p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'') +
+      '<div class="sub" style="margin-top:6px">'+esc(p.w)+'</div>' +
+      exHtml(p) +
+      '<div class="row" style="margin:18px 0 0"><button class="p" id="save">Сохранить</button><button class="g" id="skip">Пропустить</button></div>';
+    $("spk").onclick = function(){ speak(p.tr, p.lc); };
+    $("save").onclick = function(){
+      state.cards.unshift({id:Date.now().toString(36), set:p.set, w:p.w, tr:p.tr, lc:p.lc, ts:p.ts, ex:p.ex, exTr:p.exTr, ext:p.ext, score:0});
+      persist(); pending=null; box.classList.add("hide"); $("word").value=""; $("word").focus(); updateCount(); renderSets();
+    };
+    $("skip").onclick = function(){ pending=null; box.classList.add("hide"); };
+  }
+
+  // List
+  function updateCount(){ $("cnt").textContent = cards().length ? cards().length : ""; }
+  function row(c){
+    return '<div class="item"><div><b>'+esc(c.w)+'</b><div class="mute">'+esc(c.tr)+(c.ts?' · '+esc(c.ts):'')+'</div></div><span style="white-space:nowrap"><button class="spk" data-sid="'+c.id+'" aria-label="Произнести">🔊</button><button class="x" data-id="'+c.id+'" aria-label="Удалить">×</button></span></div>';
+  }
+  function renderList(){
+    var v = $("v-list");
+    if (!cards().length) { v.innerHTML = '<div class="empty">В этом наборе пока нет слов</div>'; return; }
+    var main = cards().filter(function(c){return !c.hard});
+    var hard = cards().filter(function(c){return c.hard});
+    var html = "";
+    if (main.length) html += (hard.length ? '<div class="sec">Основные · '+main.length+'</div>' : '') + main.map(row).join("");
+    if (hard.length) html += '<div class="sec">Сложные карточки · '+hard.length+'</div>' + hard.map(row).join("");
+    v.innerHTML = html;
+    v.querySelectorAll(".spk").forEach(function(b){
+      b.onclick=function(){ var c = state.cards.filter(function(x){return x.id===b.dataset.sid})[0]; if (c) speak(c.tr, c.lc); };
+    });
+    v.querySelectorAll(".x").forEach(function(b){
+      b.onclick=function(){ state.cards = state.cards.filter(function(c){return c.id!==b.dataset.id}); persist(); updateCount(); renderList(); };
+    });
+  }
+
+  // Study: основные и «сложные карточки» — две отдельные колоды
+  var cur = null, flipped = false, mode = "main", note = "";
+  var queue = [], qi = 0, known = 0, total = 0, finished = false;
+  function deck(){ return cards().filter(function(c){ return mode==="hard" ? !!c.hard : !c.hard; }); }
+  function shuffle(a){ for (var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  function startRound(){
+    queue = shuffle(deck().slice()); qi = 0; known = 0; total = queue.length; finished = false; note = "";
+    cur = queue[0] || null; drawCard();
+  }
+  function startStudy(){ startRound(); }
+  function chips(){
+    var nh = cards().filter(function(c){return c.hard}).length, nm = cards().length - nh;
+    return '<div class="chips"><button class="chip'+(mode==="main"?' on':'')+'" data-m="main">Основные '+nm+'</button><button class="chip'+(mode==="hard"?' on':'')+'" data-m="hard">Сложные карточки '+nh+'</button></div>';
+  }
+  function bindChips(){
+    $("v-study").querySelectorAll(".chip").forEach(function(b){
+      b.onclick = function(){ mode = b.dataset.m; startRound(); };
+    });
+  }
+  function resultView(){
+    var r = total ? known/total : 0, msg;
+    if (total && known===total) msg = "Молодец!";
+    else if (r >= 0.8) msg = "Почти идеально, ещё чуть-чуть";
+    else if (r >= 0.5) msg = "Есть что подучить";
+    else msg = "Не опускай руки";
+    var nh = cards().filter(function(c){return c.hard}).length;
+    return '<div class="result"><div class="score">'+known+'/'+total+' слов</div><div class="rmsg">'+msg+'</div>' +
+      '<div class="row" style="margin:24px 0 0"><button class="p" id="again">Ещё раз</button>'+(mode==="main"&&nh?'<button class="g" id="gohard">Сложные ('+nh+')</button>':'')+'</div></div>';
+  }
+  function drawCard(){
+    var v = $("v-study");
+    if (!cards().length) { v.innerHTML = '<div class="empty">В этом наборе нет слов. Добавьте их на вкладке «Добавить».</div>'; return; }
+    var head = chips() + (note ? '<div class="note">'+esc(note)+'</div>' : '');
+    if (finished) {
+      v.innerHTML = head + resultView(); bindChips();
+      $("again").onclick = startRound;
+      if ($("gohard")) $("gohard").onclick = function(){ mode = "hard"; startRound(); };
+      return;
+    }
+    if (!cur) {
+      v.innerHTML = head + '<div class="empty">'+(mode==="hard" ? 'Сложных карточек нет — отлично!' : 'Все карточки сейчас в «Сложных». Потренируйте их там.')+'</div>';
+      bindChips(); return;
+    }
+    flipped = false;
+    var back = backHtml(cur);
+    v.innerHTML = head + '<div class="prog">'+(qi+1)+' / '+total+'</div>' +
+      '<div class="scene"><div class="flip" id="fc"><div class="face"><p class="big">'+esc(cur.w)+'</p></div><div class="face back">'+back+'</div></div></div>' +
+      '<div class="hint" id="hint">нажмите, чтобы перевернуть</div>' +
+      '<div class="row hide" id="ans"><button class="g" id="no" style="color:var(--bad)">Не помню</button><button class="g" id="yes" style="color:var(--ok)">Помню</button></div>';
+    bindChips();
+    $("fc").onclick = function(e){
+      if (flipped || (e.target.closest && e.target.closest(".speak"))) return;
+      flipped = true;
+      $("fc").classList.add("on");
+      $("hint").classList.add("hide");
+      $("ans").classList.remove("hide");
+    };
+    $("cspk").onclick = function(e){ e.stopPropagation(); speak(cur.tr, cur.lc); };
+    $("yes").onclick = function(){
+      known++;
+      if (cur.hard) { cur.hard = false; cur.score = 1; note = "«"+cur.w+"» вернулось в основные карточки"; }
+      else { cur.score = Math.min(3,(cur.score||0)+1); note = ""; }
+      done();
+    };
+    $("no").onclick = function(){
+      if (!cur.hard) note = "«"+cur.w+"» перенесено в сложные карточки"; else note = "";
+      cur.hard = true; cur.score = 0;
+      done();
+    };
+  }
+  function backHtml(c){
+    return '<p class="big">'+esc(c.tr)+'</p><div class="ts" id="bts">'+esc(c.ts||"")+'</div>'+
+      '<button class="speak" id="cspk">🔊 Прослушать</button><div id="bex">'+exHtml(c)+'</div>';
+  }
+  function done(){
+    persist(); updateCount(); qi++;
+    if (qi >= total) { finished = true; cur = null; } else { cur = queue[qi]; }
+    drawCard();
+  }
+
+  function render(){ $("lang").value = state.lang; updateCount(); renderSets(); }
+  render();
+})();
+</script>
+</body>
+</html>

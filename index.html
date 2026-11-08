@@ -46,7 +46,7 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
 .empty{text-align:center;color:var(--mute);padding:40px 0}
 .spk{background:none;border:1px solid var(--line);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer;vertical-align:middle;color:var(--fg)}
 .scene{perspective:1100px}
-.flip{position:relative;height:260px;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.2,.2,1);cursor:pointer}
+.flip{position:relative;height:300px;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.2,.2,1);cursor:pointer}
 .flip.on{transform:rotateY(180deg)}
 .face{box-shadow:0 12px 40px rgba(47,107,255,.10);position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--card);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:auto;user-select:none}
 .face.back{transform:rotateY(180deg)}
@@ -67,6 +67,8 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
 .result{text-align:center;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:44px 24px;box-shadow:0 12px 40px rgba(47,107,255,.10)}
 .result .score{font-size:40px;font-weight:800}
 .result .rmsg{margin-top:8px;font-size:18px;color:var(--mute)}
+.ld{color:var(--mute);font-size:13px;margin-top:10px}
+.item.edit{display:block}
 .hide{display:none}
 </style>
 </head>
@@ -177,7 +179,7 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
   // Tabs
   var tabs = ["add","study","list"];
   function go(t){
-    tab = t;
+    tab = t; editId = null;
     tabs.forEach(function(k){ $("v-"+k).classList.toggle("hide",k!==t); $("t-"+k).classList.toggle("on",k===t); });
     if (t==="study") startStudy();
     if (t==="list") renderList();
@@ -203,6 +205,80 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
   function exHtml(c){
     return c.ex ? '<div class="exbox"><div class="e1">'+esc(c.ex)+'</div>'+(c.exTr?'<div class="e2">'+esc(c.exTr)+'</div>':'')+'</div>' : '';
   }
+  // Запасной сервис перевода, если MyMemory недоступен или лимит исчерпан
+  async function fallbackTr(w, tgt){
+    try {
+      var r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" + encodeURIComponent(tgt) + "&dt=t&q=" + encodeURIComponent(w));
+      var d = await r.json();
+      return (d[0] || []).map(function(x){ return x[0]; }).join("") || null;
+    } catch(e){ return null; }
+  }
+  // ---- Транскрипция (Викисловарь) и пример предложения (Tatoeba / Викисловарь) ----
+  var ISO = {en:["eng","English"],de:["deu","German"],fr:["fra","French"],es:["spa","Spanish"],it:["ita","Italian"],pt:["por","Portuguese"],ja:["jpn","Japanese"],zh:["cmn","Chinese"],ko:["kor","Korean"],tr:["tur","Turkish"],pl:["pol","Polish"],uk:["ukr","Ukrainian"],ru:["rus","Russian"],sv:["swe","Swedish"],no:["nob","Norwegian Bokmål"],da:["dan","Danish"],fi:["fin","Finnish"],nl:["nld","Dutch"],cs:["ces","Czech"],el:["ell","Greek"],ar:["ara","Arabic"],he:["heb","Hebrew"],hi:["hin","Hindi"],vi:["vie","Vietnamese"],th:["tha","Thai"],lv:["lav","Latvian"],lt:["lit","Lithuanian"],et:["est","Estonian"],bg:["bul","Bulgarian"],ro:["ron","Romanian"],hu:["hun","Hungarian"],sr:["srp","Serbo-Croatian"],kk:["kaz","Kazakh"],ka:["kat","Georgian"],hy:["hye","Armenian"]};
+  function isoOf(lc){ return ISO[String(lc||"").toLowerCase().split("-")[0]] || null; }
+  async function ftch(url, ms){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, ms || 8000);
+    try { var r = await fetch(url, {signal: ctl.signal}); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+    finally { clearTimeout(t); }
+  }
+  function fmtIpa(x){ x = String(x||"").replace(/\s+/g," ").trim().slice(0,90); if (!x) return ""; return /^[\/\[]/.test(x) ? x : "/"+x+"/"; }
+  function wikiSection(html, langName){
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var a = doc.getElementById(langName.replace(/ /g,"_"));
+    if (!a) return null;
+    var head = a.closest(".mw-heading") || a.closest("h2") || a, ipa = "", ex = "";
+    for (var el = head.nextElementSibling; el; el = el.nextElementSibling){
+      if (el.matches(".mw-heading2,h2")) break;
+      if (!ipa) { var s1 = el.matches(".IPA") ? el : el.querySelector(".IPA"); if (s1) ipa = s1.textContent.trim(); }
+    }
+    return {ipa: ipa, ex: ex};
+  }
+  async function wikiEntry(word, langName){
+    var lo = word.toLowerCase(), cands = [word];
+    if (lo !== word) cands.push(lo);
+    if (cap(lo) !== word && cap(lo) !== lo) cands.push(cap(lo));
+    var ok = false;
+    for (var i = 0; i < cands.length; i++){
+      try {
+        var d = await ftch("https://en.wiktionary.org/w/api.php?action=parse&format=json&formatversion=2&redirects=1&prop=text&disableeditsection=1&disabletoc=1&origin=*&page=" + encodeURIComponent(cands[i]), 10000);
+        ok = true;
+        if (!d.parse || !d.parse.text) continue;
+        var r = wikiSection(d.parse.text, langName);
+        if (r && (r.ipa || r.ex)) return {ok:true, ipa:r.ipa, ex:r.ex};
+      } catch(e){}
+    }
+    return {ok:ok, ipa:"", ex:""};
+  }
+  async function getWiki(phrase, langName){
+    var p = phrase.replace(/[.!?,;:¿¡"“”«»()]+/g,"").trim();
+    var r = await wikiEntry(p, langName), toks = p.split(/\s+/).filter(Boolean);
+    if (!r.ipa && toks.length > 1 && toks.length <= 4){
+      var parts = [], ok = r.ok;
+      for (var i = 0; i < toks.length; i++){
+        var q = await wikiEntry(toks[i], langName); ok = ok || q.ok;
+        var ip = q.ipa.replace(/^[\/\[]+|[\/\]]+$/g,"").trim();
+        if (!ip) { parts = null; break; }
+        parts.push(ip);
+      }
+      if (parts) r = {ok:ok, ipa:parts.join(" "), ex:r.ex};
+    }
+    return r;
+  }
+  async function loadExtras(word, lc){
+    var iso = isoOf(lc);
+    if (!iso) return {ts:"", tried:true};
+    var w = await getWiki(word, iso[1]).catch(function(){ return {ok:false, ipa:""}; });
+    return {ts:fmtIpa(w.ipa), tried:!!w.ok};
+  }
+  function showPending(lang, w, tr, tgt){
+    var p = pending = {set:norm(lang), w:w, tr:tr, lc:tgt, ts:"", ex:"", exTr:"", tried:false, loading:true};
+    renderPending();
+    loadExtras(tr, tgt).catch(function(){ return null; }).then(function(x){
+      p.loading = false;
+      if (x) { p.ts = x.ts; p.tried = x.tried; }
+      if (pending === p) renderPending();
+    });
+  }
   async function translate(){
     var w = $("word").value.trim(), lang = $("lang").value.trim();
     if (!w || !lang) { showMsg("Введите язык и слово."); return; }
@@ -219,14 +295,19 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
       var data = await resp.json();
       var status = Number(data.responseStatus);
       var tr = data.responseData && data.responseData.translatedText;
-      if (status === 429 || /MYMEMORY WARNING/i.test(tr || "")) { showMsg("Дневной лимит бесплатного перевода исчерпан. Попробуйте завтра или укажите e-mail в MM_EMAIL."); }
+      if (status === 429 || /MYMEMORY WARNING/i.test(tr || "")) {
+        var t1 = await fallbackTr(w, tgt);
+        if (t1) showPending(lang, w, t1, tgt);
+        else showMsg("Дневной лимит бесплатного перевода исчерпан. Попробуйте завтра или укажите e-mail в MM_EMAIL.");
+      }
       else if (status !== 200 || !tr) { showMsg("Не удалось перевести" + (data.responseDetails ? ": " + data.responseDetails : ".") ); }
       else {
-        pending = {set:norm(lang), w:w, tr:tr, lc:tgt, ts:"", ex:"", exTr:"", ext:true};
-        renderPending();
+        showPending(lang, w, tr, tgt);
       }
     } catch(e) {
-      showMsg("Нет соединения с сервисом перевода. Проверьте интернет и попробуйте ещё раз.");
+      var t2 = await fallbackTr(w, tgt);
+      if (t2) showPending(lang, w, t2, tgt);
+      else showMsg("Нет соединения с сервисом перевода. Проверьте интернет, отключите блокировщик рекламы/VPN и попробуйте ещё раз." + (e && e.message ? " (" + e.message + ")" : ""));
     }
     $("go").disabled = false; $("go").textContent = "Перевести";
   }
@@ -237,11 +318,11 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
     box.innerHTML = '<p class="big">'+esc(p.tr)+' <button class="spk" id="spk" aria-label="Произнести">🔊</button></p>' +
       (p.ts?'<div class="ts">'+esc(p.ts)+'</div>':'') +
       '<div class="sub" style="margin-top:6px">'+esc(p.w)+'</div>' +
-      exHtml(p) +
+      exHtml(p) + (p.loading ? '<div class="ld">Ищу транскрипцию…</div>' : '') +
       '<div class="row" style="margin:18px 0 0"><button class="p" id="save">Сохранить</button><button class="g" id="skip">Пропустить</button></div>';
     $("spk").onclick = function(){ speak(p.tr, p.lc); };
     $("save").onclick = function(){
-      state.cards.unshift({id:Date.now().toString(36), set:p.set, w:p.w, tr:p.tr, lc:p.lc, ts:p.ts, ex:p.ex, exTr:p.exTr, ext:p.ext, score:0});
+      state.cards.unshift({id:Date.now().toString(36), set:p.set, w:p.w, tr:p.tr, lc:p.lc, ts:p.ts, ex:p.ex, exTr:p.exTr, tried:p.tried, score:0});
       persist(); pending=null; box.classList.add("hide"); $("word").value=""; $("word").focus(); updateCount(); renderSets();
     };
     $("skip").onclick = function(){ pending=null; box.classList.add("hide"); };
@@ -249,8 +330,26 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
 
   // List
   function updateCount(){ $("cnt").textContent = cards().length ? cards().length : ""; }
+  async function trWord(w, tgt){
+    var src = /[а-яё]/i.test(w) ? "ru" : "Autodetect";
+    try {
+      var d = await ftch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(w) + "&langpair=" + encodeURIComponent(src + "|" + tgt) + (MM_EMAIL ? "&de=" + encodeURIComponent(MM_EMAIL) : ""));
+      var t = d.responseData && d.responseData.translatedText;
+      if (Number(d.responseStatus) === 200 && t && !/MYMEMORY WARNING/i.test(t)) return t;
+    } catch(e){}
+    return await fallbackTr(w, tgt);
+  }
+  var editId = null;
+  function attr(x){ return esc(x).replace(/"/g,"&quot;"); }
+  function fld(id, label, val){ return '<label for="'+id+'">'+label+'</label><input id="'+id+'" value="'+attr(val||"")+'" style="margin-bottom:12px" autocomplete="off">'; }
+  function editForm(c){
+    return '<div class="item edit">' + fld("ed-w","Слово",c.w) + fld("ed-tr","Перевод",c.tr) + fld("ed-ts","Транскрипция",c.ts) + fld("ed-ex","Пример предложения (по желанию)",c.ex) + fld("ed-exTr","Перевод примера (по желанию)",c.exTr) +
+      '<div class="ld" style="margin:-4px 0 12px">Если изменить слово, перевод и транскрипция подберутся заново, а старый пример очистится (если вы не впишете новый). Если изменить другое поле, поменяется только оно.</div>' +
+      '<div class="row" style="margin:6px 0 0"><button class="p" id="ed-save">Сохранить</button><button class="g" id="ed-cancel">Отмена</button></div><div class="msg hide" id="ed-msg"></div></div>';
+  }
   function row(c){
-    return '<div class="item"><div><b>'+esc(c.w)+'</b><div class="mute">'+esc(c.tr)+(c.ts?' · '+esc(c.ts):'')+'</div></div><span style="white-space:nowrap"><button class="spk" data-sid="'+c.id+'" aria-label="Произнести">🔊</button><button class="x" data-id="'+c.id+'" aria-label="Удалить">×</button></span></div>';
+    if (c.id === editId) return editForm(c);
+    return '<div class="item"><div><b>'+esc(c.w)+'</b><div class="mute">'+esc(c.tr)+(c.ts?' · '+esc(c.ts):'')+'</div>'+(c.ex?'<div class="mute" style="font-style:italic">'+esc(c.ex)+'</div>':'')+'</div><span style="white-space:nowrap"><button class="spk" data-sid="'+c.id+'" aria-label="Произнести">🔊</button><button class="x" data-eid="'+c.id+'" aria-label="Редактировать">✎</button><button class="x" data-id="'+c.id+'" aria-label="Удалить">×</button></span></div>';
   }
   function renderList(){
     var v = $("v-list");
@@ -264,9 +363,44 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
     v.querySelectorAll(".spk").forEach(function(b){
       b.onclick=function(){ var c = state.cards.filter(function(x){return x.id===b.dataset.sid})[0]; if (c) speak(c.tr, c.lc); };
     });
-    v.querySelectorAll(".x").forEach(function(b){
+    v.querySelectorAll(".x[data-id]").forEach(function(b){
       b.onclick=function(){ state.cards = state.cards.filter(function(c){return c.id!==b.dataset.id}); persist(); updateCount(); renderList(); };
     });
+    v.querySelectorAll(".x[data-eid]").forEach(function(b){
+      b.onclick=function(){ editId = b.dataset.eid; renderList(); };
+    });
+    if ($("ed-save")) {
+      $("ed-save").onclick = async function(){
+        var c = state.cards.filter(function(x){return x.id===editId})[0];
+        if (!c) { editId = null; renderList(); return; }
+        var m = $("ed-msg"), btn = $("ed-save"), id = c.id;
+        var w = $("ed-w").value.trim(), tr = $("ed-tr").value.trim(), ts = $("ed-ts").value.trim(), ex = $("ed-ex").value.trim(), exTr = $("ed-exTr").value.trim();
+        var o = {w:c.w, tr:c.tr, ts:c.ts||"", ex:c.ex||"", exTr:c.exTr||""};
+        m.classList.add("hide");
+        if (!w || (!tr && w === o.w)) { m.textContent = "Слово и перевод не могут быть пустыми."; m.classList.remove("hide"); return; }
+        var n = {w:w, tr:tr, ts:ts, ex:ex, exTr:exTr}, tried = true;
+        if (w !== o.w) {
+          // слово изменено: всё, что пользователь не правил вручную, подбирается заново под новое слово
+          btn.disabled = true; btn.textContent = "Ищу…";
+          var lc = c.lc || langCode(c.set);
+          var tr2 = (tr && tr !== o.tr) ? tr : await trWord(w, lc);
+          if (editId !== id) return;
+          if (!tr2) { btn.disabled = false; btn.textContent = "Сохранить"; m.textContent = "Не удалось перевести новое слово. Проверьте соединение или введите перевод вручную."; m.classList.remove("hide"); return; }
+          n.tr = tr2;
+          var x = null;
+          try { x = await loadExtras(n.tr, lc); } catch(e){}
+          if (editId !== id) return;
+          var exEdited = ex !== o.ex, exTrEdited = exTr !== o.exTr, tsEdited = ts !== o.ts;
+          n.ts = tsEdited ? ts : (x ? x.ts : "");
+          n.ex = exEdited ? ex : "";
+          n.exTr = exTrEdited ? exTr : "";
+          tried = !!(x && x.tried);
+        }
+        c.w = n.w; c.tr = n.tr; c.ts = n.ts; c.ex = n.ex; c.exTr = n.exTr; c.tried = tried;
+        persist(); editId = null; renderList();
+      };
+      $("ed-cancel").onclick = function(){ editId = null; renderList(); };
+    }
   }
 
   // Study: основные и «сложные карточки» — две отдельные колоды
@@ -325,6 +459,7 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
       $("fc").classList.add("on");
       $("hint").classList.add("hide");
       $("ans").classList.remove("hide");
+      fillExtras(cur);
     };
     $("cspk").onclick = function(e){ e.stopPropagation(); speak(cur.tr, cur.lc); };
     $("yes").onclick = function(){
@@ -342,6 +477,17 @@ button.g{background:none;border:1px solid var(--line);color:var(--fg);border-rad
   function backHtml(c){
     return '<p class="big">'+esc(c.tr)+'</p><div class="ts" id="bts">'+esc(c.ts||"")+'</div>'+
       '<button class="speak" id="cspk">🔊 Прослушать</button><div id="bex">'+exHtml(c)+'</div>';
+  }
+  var loadingEx = {};
+  async function fillExtras(c){
+    if (c.ts || c.tried || loadingEx[c.id]) return;
+    loadingEx[c.id] = true;
+    if (cur === c && $("bex")) $("bex").innerHTML = '<div class="ld">Ищу транскрипцию…</div>';
+    var x = null;
+    try { x = await loadExtras(c.tr, c.lc || langCode(c.set)); } catch(e){}
+    delete loadingEx[c.id];
+    if (x && x.tried) { c.ts = c.ts || x.ts; c.tried = true; persist(); }
+    if (cur === c && $("bts")) { $("bts").textContent = c.ts || ""; $("bex").innerHTML = exHtml(c); }
   }
   function done(){
     persist(); updateCount(); qi++;
